@@ -1,17 +1,18 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Question } from '../types';
+import { Question, UserResult } from '../types';
 import { MatchingExercise } from './MatchingExercise';
 
 interface QuizGameProps {
   questions: Question[];
-  onFinish: (score: number) => void;
+  onFinish: (score: number, results: UserResult[]) => void;
   onQuit: () => void;
 }
 
 export const QuizGame: React.FC<QuizGameProps> = ({ questions, onFinish, onQuit }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [score, setScore] = useState(0);
+  const [userResults, setUserResults] = useState<UserResult[]>([]);
   const [lastBonus, setLastBonus] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
   const [qrocValue, setQrocValue] = useState("");
@@ -31,13 +32,13 @@ export const QuizGame: React.FC<QuizGameProps> = ({ questions, onFinish, onQuit 
       setShowExplanation(false);
       setLastBonus(0);
     } else {
-      onFinish(score);
+      onFinish(score, userResults);
     }
-  }, [currentIndex, questions.length, score, onFinish]);
+  }, [currentIndex, questions.length, score, userResults, onFinish]);
 
   useEffect(() => {
     if (timeLeft <= 0 && !showExplanation) {
-      handleValidate(false); 
+      handleValidate(false, "Temps écoulé"); 
     }
 
     if (timeLeft > 0 && !showExplanation) {
@@ -47,18 +48,14 @@ export const QuizGame: React.FC<QuizGameProps> = ({ questions, onFinish, onQuit 
   }, [timeLeft, showExplanation]);
 
   const normalizeString = (str: string) => {
-    // 1. Lowercase
     let s = str.trim().toLowerCase();
-    // 2. Remove accents
     s = s.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    // 3. Remove common French articles at the beginning
-    // Articles: le, la, les, l', un, une, des, du, de
     s = s.replace(/^(le|la|les|un|une|des|du|de)\s+/g, "");
     s = s.replace(/^(l'|d')/g, "");
     return s.trim();
   };
 
-  const handleValidate = (correct: boolean) => {
+  const handleValidate = (correct: boolean, userAnswer: string) => {
     setIsCorrect(correct);
     if (correct) {
       const speedBonus = timeLeft * 10;
@@ -66,13 +63,20 @@ export const QuizGame: React.FC<QuizGameProps> = ({ questions, onFinish, onQuit 
       setScore(prev => prev + points);
       setLastBonus(speedBonus);
     }
+    
+    setUserResults(prev => [...prev, {
+      question: currentQuestion,
+      userAnswer: userAnswer,
+      isCorrect: correct
+    }]);
+    
     setShowExplanation(true);
   };
 
   const handleQcmSelect = (option: string) => {
     if (showExplanation) return;
     setSelectedAnswer(option);
-    handleValidate(option === currentQuestion.correctAnswer);
+    handleValidate(option === currentQuestion.correctAnswer, option);
   };
 
   const handleQrocSubmit = (e: React.FormEvent) => {
@@ -83,12 +87,11 @@ export const QuizGame: React.FC<QuizGameProps> = ({ questions, onFinish, onQuit 
     const isOk = currentQuestion.acceptedAnswers?.some(ans => 
       normalizeString(ans) === normalizedInput
     );
-    handleValidate(!!isOk);
+    handleValidate(!!isOk, qrocValue);
   };
 
   return (
     <div className="max-w-2xl mx-auto space-y-4 animate-fadeIn">
-      {/* HUD avec bouton Quitter */}
       <div className="flex justify-between items-center bg-black/40 p-4 rounded-2xl border border-white/10 backdrop-blur-sm">
         <button 
           onClick={onQuit}
@@ -123,7 +126,6 @@ export const QuizGame: React.FC<QuizGameProps> = ({ questions, onFinish, onQuit 
           {currentQuestion.text}
         </h3>
 
-        {/* --- QCM DISPLAY --- */}
         {currentQuestion.type === 'QCM' && (
           <div className="grid grid-cols-1 gap-3">
             {currentQuestion.options?.map((option, idx) => {
@@ -148,7 +150,6 @@ export const QuizGame: React.FC<QuizGameProps> = ({ questions, onFinish, onQuit 
           </div>
         )}
 
-        {/* --- QROC DISPLAY --- */}
         {currentQuestion.type === 'QROC' && (
           <form onSubmit={handleQrocSubmit} className="space-y-4">
             <input
@@ -176,11 +177,10 @@ export const QuizGame: React.FC<QuizGameProps> = ({ questions, onFinish, onQuit 
           </form>
         )}
 
-        {/* --- MATCHING DISPLAY --- */}
         {currentQuestion.type === 'MATCHING' && currentQuestion.pairs && (
           <MatchingExercise 
             pairs={currentQuestion.pairs} 
-            onComplete={() => handleValidate(true)} 
+            onComplete={() => handleValidate(true, "Exercice réussi")} 
           />
         )}
       </div>

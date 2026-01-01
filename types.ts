@@ -32,6 +32,12 @@ export interface Question {
   explanation: string;
 }
 
+export interface UserResult {
+  question: Question;
+  userAnswer: string;
+  isCorrect: boolean;
+}
+
 export interface QuizState {
   currentQuestionIndex: number;
   score: number;
